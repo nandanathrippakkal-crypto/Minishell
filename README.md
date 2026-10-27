@@ -1,2 +1,2 @@
 # Minishell
-Minishell implementation in on Linux
+Minishell implementation in C on Linux
