@@ -1,5 +1,5 @@
 
-#include "minishell.h"
+#include "main.h"
 
 int convert_input_string_to_args(char input_string[], char args[][100]);
 
@@ -7,10 +7,13 @@ int main(void)
 {
     char PS1[100] = "minishell$ ";
     char input_string[100];
-    char new_prompt[100] = "";
+    char new_prompt[100];
     char args[20][100];
+    char cwd[1024];
     int count;
     int i;
+    pid_t pid;
+    int status;
 
     system("clear");
 
@@ -18,18 +21,17 @@ int main(void)
     {
         printf("%s", PS1);
 
-        if (scanf("%99[^\n]", input_string) != 1)
+        if (fgets(input_string, sizeof(input_string), stdin) == NULL)
         {
-            if (feof(stdin))
-            {
-                break;
-            }
-
-            getchar();
-            continue;
+            break;
         }
 
-        getchar();
+        input_string[strcspn(input_string, "\n")] = '\0';
+
+        if (input_string[0] == '\0')
+        {
+            continue;
+        }
 
         if (input_string[0] == ' ')
         {
@@ -56,13 +58,88 @@ int main(void)
 
         count = convert_input_string_to_args(input_string, args);
 
-        for (i = 0; i < count; i++)
+        if (count == 0)
         {
-            printf("args[%d] = %s\n", i, args[i]);
+            continue;
+        }
+
+        if (strcmp(args[0], "exit") == 0)
+        {
+            break;
+        }
+        else if (strcmp(args[0], "pwd") == 0)
+        {
+            if (getcwd(cwd, sizeof(cwd)) != NULL)
+            {
+                printf("%s\n", cwd);
+            }
+            else
+            {
+                perror("pwd");
+            }
+        }
+        else if (strcmp(args[0], "cd") == 0)
+        {
+            if (count == 1)
+            {
+                printf("Usage: cd <directory>\n");
+            }
+            else if (chdir(args[1]) == -1)
+            {
+                perror("cd");
+            }
+        }
+        else if (strcmp(args[0], "echo") == 0)
+        {
+            for (i = 1; i < count; i++)
+            {
+                printf("%s", args[i]);
+
+                if (i < count - 1)
+                {
+                    printf(" ");
+                }
+            }
+
+            printf("\n");
+        }
+        else
+        {
+            if (check_external_command(args[0]) == 1)
+            {
+                pid = fork();
+
+                if (pid == 0)
+                {
+                    char *argv[20];
+
+                    for (i = 0; i < count; i++)
+                    {
+                        argv[i] = args[i];
+                    }
+
+                    argv[count] = NULL;
+
+                    execvp(argv[0], argv);
+
+                    perror("Command");
+                    exit(1);
+                }
+                else if (pid > 0)
+                {
+                    waitpid(pid, &status, 0);
+                }
+                else
+                {
+                    perror("fork");
+                }
+            }
+            else
+            {
+                printf("Command not found: %s\n", args[0]);
+            }
         }
     }
 
     return 0;
 }
-
-
